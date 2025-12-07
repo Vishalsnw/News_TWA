@@ -24,4 +24,4 @@ When code is added to this project, typical TWA setup would include:
 To be determined once code is added to the repository.
 
 ## Recent Changes
-- December 07, 2025: Initial import from GitHub - repository contains only LICENSE file
+- December 07, 2025: Initial import from GitHub - repository contains only LICENSE file..
