@@ -1,11 +1,10 @@
 package com.news.twa;
 
 import android.annotation.SuppressLint;
-import android.content.Intent;
+import android.app.AlertDialog;
 import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebChromeClient;
@@ -15,6 +14,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 
@@ -24,13 +24,14 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 public class MainActivity extends AppCompatActivity {
 
     private static final String WEBSITE_URL = "https://news-alpha-two.vercel.app/";
-    private static final String ALLOWED_HOST = "news-alpha-two.vercel.app";
 
     private WebView webView;
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipeRefreshLayout;
     private LinearLayout errorLayout;
     private Button retryButton;
+    private ImageButton homeButton;
+    private ImageButton exitButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +42,8 @@ public class MainActivity extends AppCompatActivity {
         setupWebView();
         setupSwipeRefresh();
         setupRetryButton();
+        setupHomeButton();
+        setupExitButton();
 
         if (isNetworkAvailable()) {
             loadWebsite();
@@ -55,6 +58,8 @@ public class MainActivity extends AppCompatActivity {
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
+        homeButton = findViewById(R.id.homeButton);
+        exitButton = findViewById(R.id.exitButton);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -69,14 +74,19 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setAllowContentAccess(false);
         webSettings.setLoadsImagesAutomatically(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        
         webSettings.setSupportZoom(true);
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false);
         webSettings.setUseWideViewPort(true);
         webSettings.setLoadWithOverviewMode(true);
+        
+        webSettings.setTextZoom(100);
 
         webView.setWebViewClient(new CustomWebViewClient());
         webView.setWebChromeClient(new CustomWebChromeClient());
+        
+        webView.setInitialScale(1);
     }
 
     private void setupSwipeRefresh() {
@@ -101,6 +111,30 @@ public class MainActivity extends AppCompatActivity {
                 loadWebsite();
             }
         });
+    }
+
+    private void setupHomeButton() {
+        homeButton.setOnClickListener(v -> goHome());
+    }
+
+    private void setupExitButton() {
+        exitButton.setOnClickListener(v -> showExitDialog());
+    }
+
+    private void goHome() {
+        webView.clearHistory();
+        webView.loadUrl(WEBSITE_URL);
+    }
+
+    private void showExitDialog() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.exit)
+            .setMessage(R.string.exit_confirm)
+            .setPositiveButton(R.string.yes, (dialog, which) -> {
+                finishAffinity();
+            })
+            .setNegativeButton(R.string.no, null)
+            .show();
     }
 
     private void loadWebsite() {
@@ -133,8 +167,30 @@ public class MainActivity extends AppCompatActivity {
         if (webView.canGoBack()) {
             webView.goBack();
         } else {
-            super.onBackPressed();
+            goHome();
         }
+    }
+
+    private void hideSubscriptionPopups() {
+        String js = "javascript:(function() { " +
+            "var selectors = [" +
+            "'.subscribe-popup', '.subscription-modal', '.paywall', '.subscribe-wall'," +
+            "'.modal-overlay', '.subscription-overlay', '.login-wall', '.signin-wall'," +
+            "'[class*=\"subscribe\"]', '[class*=\"paywall\"]', '[class*=\"signin\"]'," +
+            "'[id*=\"subscribe\"]', '[id*=\"paywall\"]', '[id*=\"modal\"]'" +
+            "];" +
+            "selectors.forEach(function(sel) {" +
+            "  var elements = document.querySelectorAll(sel);" +
+            "  elements.forEach(function(el) {" +
+            "    if(el.style.position === 'fixed' || el.style.position === 'absolute') {" +
+            "      el.style.display = 'none';" +
+            "    }" +
+            "  });" +
+            "});" +
+            "document.body.style.overflow = 'auto';" +
+            "document.documentElement.style.overflow = 'auto';" +
+            "})()";
+        webView.evaluateJavascript(js, null);
     }
 
     private class CustomWebViewClient extends WebViewClient {
@@ -164,6 +220,7 @@ public class MainActivity extends AppCompatActivity {
             super.onPageFinished(view, url);
             progressBar.setVisibility(View.GONE);
             swipeRefreshLayout.setRefreshing(false);
+            hideSubscriptionPopups();
         }
 
         @Override
