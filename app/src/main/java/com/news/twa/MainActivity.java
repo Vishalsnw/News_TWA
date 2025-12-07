@@ -141,15 +141,14 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-            String url = request.getUrl().toString();
-            Uri uri = Uri.parse(url);
-            
-            if (uri.getHost() != null && uri.getHost().contains(ALLOWED_HOST)) {
-                return false;
-            }
-            
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            startActivity(intent);
+            view.loadUrl(request.getUrl().toString());
+            return true;
+        }
+
+        @SuppressWarnings("deprecation")
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            view.loadUrl(url);
             return true;
         }
 
