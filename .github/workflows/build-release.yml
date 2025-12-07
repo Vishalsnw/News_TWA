@@ -1,0 +1,142 @@
+name: Build Signed Release APK & AAB
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Create keystore from hardcoded values
+        run: |
+          mkdir -p app/keystore
+          keytool -genkey -v \
+            -keystore app/keystore/release-key.jks \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias news_india_key \
+            -storepass NewsIndia@2024 \
+            -keypass NewsIndia@2024 \
+            -dname "CN=News India, OU=Mobile, O=News India, L=Mumbai, ST=Maharashtra, C=IN"
+
+      - name: Create keystore.properties
+        run: |
+          cat > keystore.properties << EOF
+          storeFile=keystore/release-key.jks
+          storePassword=NewsIndia@2024
+          keyAlias=news_india_key
+          keyPassword=NewsIndia@2024
+          EOF
+
+      - name: Update app build.gradle for signing
+        run: |
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          def keystorePropertiesFile = rootProject.file("keystore.properties")
+          def keystoreProperties = new Properties()
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
+          android {
+              namespace 'com.news.twa'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.news.twa"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0.0"
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file(keystoreProperties['storeFile'] ?: 'keystore/release-key.jks')
+                      storePassword keystoreProperties['storePassword'] ?: 'NewsIndia@2024'
+                      keyAlias keystoreProperties['keyAlias'] ?: 'news_india_key'
+                      keyPassword keystoreProperties['keyPassword'] ?: 'NewsIndia@2024'
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled true
+                      shrinkResources true
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                      signingConfig signingConfigs.release
+                  }
+                  debug {
+                      minifyEnabled false
+                      debuggable true
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+              implementation 'com.google.android.material:material:1.11.0'
+          }
+          EOF
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Build Release AAB
+        run: ./gradlew bundleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: app/build/outputs/bundle/release/*.aab
+
+      - name: Create Release Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### APK" >> $GITHUB_STEP_SUMMARY
+          ls -lh app/build/outputs/apk/release/*.apk 2>/dev/null || echo "No APK found" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### AAB (for Google Play)" >> $GITHUB_STEP_SUMMARY
+          ls -lh app/build/outputs/bundle/release/*.aab 2>/dev/null || echo "No AAB found" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Signing Info" >> $GITHUB_STEP_SUMMARY
+          echo "- Key Alias: news_india_key" >> $GITHUB_STEP_SUMMARY
+          echo "- Validity: 10000 days" >> $GITHUB_STEP_SUMMARY

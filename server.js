@@ -40,7 +40,8 @@ app.get('/download-project', (req, res) => {
     'app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
     'app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
     'app/src/main/res/xml/network_security_config.xml',
-    'gradle/wrapper/gradle-wrapper.properties'
+    'gradle/wrapper/gradle-wrapper.properties',
+    '.github/workflows/build-release.yml'
   ];
 
   filesToInclude.forEach(file => {
